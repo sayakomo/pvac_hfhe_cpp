@@ -15,9 +15,9 @@ so, the objective of this challenge can be described simply as: **decrypt `seed.
 several files are presented for your audit:
 ```
 bounty_data/
-├── seed.ct       # ciphertext (target)
-├── pk.bin        # public key
-├── params.json   # scheme parameters
+├── seed.ct # ciphertext (target)
+├── pk.bin # public key
+├── params.json # scheme parameters
 ```
 
 **key struct:**
