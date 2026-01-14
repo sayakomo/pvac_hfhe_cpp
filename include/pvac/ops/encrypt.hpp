@@ -152,6 +152,13 @@ inline Edge make_edge(uint32_t lid, uint16_t idx, uint8_t ch, Fp w,
     return {lid, idx, ch, w, sigma_from_H(pk, seed.ztag, seed.nonce, idx, ch, csprng_u64())};
 }
 
+inline void shuffle_edges(std::vector<Edge>& E) {
+    size_t n = E.size();
+    if (n < 2) return;
+    for (size_t i = n - 1; i > 0; --i)
+        std::swap(E[i], E[csprng_u64() % (i + 1)]);
+}
+
 inline Cipher enc_fp_depth(const PubKey& pk, const SecKey& sk, const Fp& v, int depth_hint) {
     Cipher C;
 
@@ -174,29 +181,16 @@ inline Cipher enc_fp_depth(const PubKey& pk, const SecKey& sk, const Fp& v, int 
         ch[j] = csprng_u64() & 1;
     }
 
-    Fp sum1 = fp_from_u64(0), sumg = fp_from_u64(0);
-    for (int j = 0; j < S - 2; j++) {
+    Fp sumg = fp_from_u64(0);
+    for (int j = 0; j < S - 1; j++) {
         r[j] = rand_fp_nonzero();
-        int s = sgn_val(ch[j]);
-        sum1 = s > 0 ? fp_add(sum1, r[j]) : fp_sub(sum1, r[j]);
         Fp term = fp_mul(r[j], pk.powg_B[idx[j]]);
-        sumg = s > 0 ? fp_add(sumg, term) : fp_sub(sumg, term);
+        sumg = sgn_val(ch[j]) > 0 ? fp_add(sumg, term) : fp_sub(sumg, term);
     }
 
-    int ia = idx[S-2], ib = idx[S-1];
-    int sa = sgn_val(ch[S-2]), sb = sgn_val(ch[S-1]);
-    Fp ga = pk.powg_B[ia], gb = pk.powg_B[ib];
-
-    Fp V = fp_sub(v, sumg);
-    Fp rhs = fp_sub(fp_neg(fp_mul(sum1, ga)), V);
-    Fp rb = fp_mul(rhs, fp_inv(fp_sub(ga, gb)));
-    if (sb < 0) rb = fp_neg(rb);
-
-    Fp tmp = sb > 0 ? fp_sub(fp_neg(sum1), rb) : fp_add(fp_neg(sum1), rb);
-    Fp ra = sa > 0 ? tmp : fp_neg(tmp);
-
-    r[S-2] = ra;
-    r[S-1] = rb;
+    Fp g_last = pk.powg_B[idx[S-1]];
+    Fp r_last = fp_mul(fp_sub(v, sumg), fp_inv(g_last));
+    r[S-1] = sgn_val(ch[S-1]) < 0 ? fp_neg(r_last) : r_last;
 
     Fp R = prf_R(pk, sk, L.seed);
 
@@ -257,7 +251,9 @@ inline Cipher enc_fp_depth(const PubKey& pk, const SecKey& sk, const Fp& v, int 
         C.E.push_back(make_edge(0, k, s3, fp_mul(c, R), pk, L.seed));
     }
 
+    compact_edges(pk, C);
     guard_budget(pk, C, "enc");
+    shuffle_edges(C.E);
     return C;
 }
 
