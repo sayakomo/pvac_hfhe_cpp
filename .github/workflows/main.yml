@@ -1,0 +1,30 @@
+name: Monitor Secret Key Leakage (Upstream Only)
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  scan:
+    # ⛔ Jangan jalan di fork
+    if: github.event.repository.fork == false
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secret key
+        run: |
+          echo "Scanning upstream repository for sk.bin..."
+
+          if find . -type f -name "sk.bin" | grep -q .; then
+            echo "❌ sk.bin FOUND"
+            exit 1
+          fi
+
+          echo "✔ No sk.bin found"
