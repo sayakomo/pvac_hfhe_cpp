@@ -16,50 +16,29 @@ jobs:
           fetch-depth: 0
 
       - name: Scan for sensitive files
-        id: scan
         run: |
           echo "Scanning repository..."
 
           FOUND=0
 
           if find . -type f -name "sk.bin" | grep -q .; then
-            echo "Found sk.bin"
+            echo "❌ Found sk.bin"
             FOUND=1
           fi
 
           if find . -type f -name "*.bin" | grep -q .; then
-            echo "Found *.bin"
+            echo "❌ Found *.bin"
             FOUND=1
           fi
 
           if find . -type d -name "bounty3_data" | grep -q .; then
-            echo "Found bounty3_data directory"
+            echo "❌ Found bounty3_data directory"
             FOUND=1
           fi
 
-          echo "found=$FOUND" >> $GITHUB_OUTPUT
+          if [ "$FOUND" -eq 1 ]; then
+            echo "::error ::Sensitive artifact detected in repository"
+            exit 1
+          fi
 
-      - name: Create alert issue
-        if: steps.scan.outputs.found == '1'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = "⚠️ Sensitive artifact detected in repository";
-            const body = `
-            A push introduced one or more sensitive artifacts:
-
-            - sk.bin
-            - *.bin
-            - bounty3_data/
-
-            Please review the latest commit immediately.
-
-            Commit: ${context.sha}
-            Actor: ${context.actor}
-            `;
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body
-            });
+          echo "No sensitive artifacts found."
