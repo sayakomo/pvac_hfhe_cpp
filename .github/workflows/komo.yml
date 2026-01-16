@@ -1,0 +1,65 @@
+name: Monitor Sensitive Artifacts
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for sensitive files
+        id: scan
+        run: |
+          echo "Scanning repository..."
+
+          FOUND=0
+
+          if find . -type f -name "sk.bin" | grep -q .; then
+            echo "Found sk.bin"
+            FOUND=1
+          fi
+
+          if find . -type f -name "*.bin" | grep -q .; then
+            echo "Found *.bin"
+            FOUND=1
+          fi
+
+          if find . -type d -name "bounty3_data" | grep -q .; then
+            echo "Found bounty3_data directory"
+            FOUND=1
+          fi
+
+          echo "found=$FOUND" >> $GITHUB_OUTPUT
+
+      - name: Create alert issue
+        if: steps.scan.outputs.found == '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "⚠️ Sensitive artifact detected in repository";
+            const body = `
+            A push introduced one or more sensitive artifacts:
+
+            - sk.bin
+            - *.bin
+            - bounty3_data/
+
+            Please review the latest commit immediately.
+
+            Commit: ${context.sha}
+            Actor: ${context.actor}
+            `;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body
+            });
